@@ -10,4 +10,7 @@
 #include <arpa/inet.h>
 #include <sys/wait.h>
 
-#define localhost 127.0.0.1
+#define localhost "127.0.0.1"
+
+#define CA2SMPort 25840
+#define CB2SMPOrt 26840

@@ -1,8 +1,8 @@
-#include <globals.h>
+#include "clientA.h"
 
 /* Messages */
 void printBootUp() {
-  printf("The client A is up and running.\n");
+  printf("The client %c is up and running.\n", clientID);
 }
 
 void printUserCheck(char* usr) {
@@ -13,13 +13,63 @@ void printUserTransfer(char* sender, char* receiver, int amt) {
   printf("%s has requested to transfer %d coins to %s.\n", sender, amt, receiver);
 }
 
+/* Initializes a TCP socket and connect to serverM */
+int connectToServer() {
+  int status = 0;
+
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  if (sockfd < 0) {
+    perror("Could not create socket.\n");
+    return sockfd;
+  }
+
+  struct sockaddr_in servAddr;
+  servAddr.sin_family = AF_INET;
+  servAddr.sin_port = htons(assignedPort);
+  status = inet_aton(localhost, &servAddr.sin_addr);
+  if (!status) {
+    perror("Could not convert host address.\n");
+    return status;
+  }
+
+  status = connect(sockfd, (struct sockaddr *)&servAddr, sizeof(servAddr));
+  if (status) {
+    perror("Error when connecting to server.\n");
+    return status;
+  }
+  
+  return status;
+}
+
+/* Close socket */
+int disconnectFromServer() {
+  int status = close(sockfd);
+  if (status) {
+    perror("Error closing socket.\n");
+    return status;
+  }
+}
+
+/* Perform user check */
 int userCheck(char* usr) {
+  int status = 0;
+  connectToServer();
+
+  // Set up message
+  checkUserRequest req;
+  strncpy(req.name, usr, MAX_NAME_LENGTH);
+
   printUserCheck(usr);
+  status = send(sockfd, (void *)&req, sizeof(req), 0);
+
+  disconnectFromServer();
   return 0;
 }
 
 int userTransfer(char* sender, char* receiver, int amt) {
+  connectToServer();
   printUserTransfer(sender, receiver, amt);
+  disconnectFromServer();
   return 0;
 }
 

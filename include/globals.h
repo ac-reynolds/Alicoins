@@ -13,4 +13,11 @@
 #define localhost "127.0.0.1"
 
 #define CA2SMPort 25840
-#define CB2SMPOrt 26840
+#define CB2SMPort 26840
+
+#define MAX_NAME_LENGTH 64
+
+typedef struct CheckUserRequest {
+  char name[MAX_NAME_LENGTH];
+} checkUserRequest;
+

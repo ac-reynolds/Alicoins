@@ -1,4 +1,3 @@
-#include "globals.h"
 #include "serverM.h"
 
 /* Messages */
@@ -16,7 +15,6 @@ void printUserTransfer(char* sender, char* receiver, int amt, int port) {
 
 /* Initializes both sockets for incoming communication, but does not start accepting connections. */
 int initializeSockets() {
-
   int status = 0;
 
   // Create parent sockets
@@ -25,11 +23,18 @@ int initializeSockets() {
     perror("Could not create parent socket A.\n");
     return socketParentA;
   }
+  
+  int optval = 1;
+  status = setsockopt(socketParentA, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+  if (status) {
+    perror("Could not set socket option.\n");
+    return status;
+  }
 
   // Define addresses to be connected to by each client
   struct sockaddr_in addrA;
   addrA.sin_family = AF_INET;
-  addrA.sin_port = CA2SMPort;
+  addrA.sin_port = htons(CA2SMPort);
   status = inet_aton(localhost, &addrA.sin_addr);
   if (!status) {
     perror("Could not convert host address for parent socket A.\n");
@@ -52,17 +57,41 @@ int initializeSockets() {
 
 }
 
+int handleTCPMessage(int sockfd) {
+  int status = 0;
+
+  checkUserRequest req;
+  recv(sockfd, (checkUserRequest *)&req, sizeof(req), 0);
+  printUserCheck(req.name, 3);
+
+  return 0;
+}
+
+/* Passively awaits connections, blocking until a connection is received. On
+   such receipt, the connection is accepted and appropriate action is taken. */
 int acceptConnections() {
+  int status = 0;
   struct sockaddr incomingAddrA;
+  socklen_t incomingAddrASize;
   int incomingSocketA;
+
+  incomingAddrASize = sizeof(incomingAddrA);
+  while(1) {
+    incomingSocketA = accept(socketParentA, &incomingAddrA, &incomingAddrASize);
+    status = handleTCPMessage(incomingSocketA);
+    if (status) return status;
+    close(incomingSocketA);
+  }
 }
 
 int main() {
 
   int status = 0;
 
-  initializeSockets();
+  status = initializeSockets();
+  if (status) return status;
   printBootUp();
-  acceptConnections();
+  status = acceptConnections();
+  if (status) return status;
   return 0;
 }

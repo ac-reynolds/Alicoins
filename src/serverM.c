@@ -17,52 +17,62 @@ void printUserTransfer(char* sender, char* receiver, int amt, int port) {
 int initializeSockets() {
   int status = 0;
 
-  // Create parent sockets
-  socketParentA = socket(AF_INET, SOCK_STREAM, 0);
-  if (socketParentA < 0) {
-    perror("Could not create parent socket A.\n");
-    return socketParentA;
-  }
+  // Initialize once for each TCP socket to listen on
+  for (int i = 0; i < 2; i++) {
+    // Create parent sockets
+    socketParents[i] = socket(AF_INET, SOCK_STREAM, 0);
+    if (socketParents[i] < 0) {
+      perror("Could not create parent TCP socket.\n");
+      return socketParents[i];
+    }
   
-  int optval = 1;
-  status = setsockopt(socketParentA, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-  if (status) {
-    perror("Could not set socket option.\n");
-    return status;
-  }
+    int optval = 1;
+    status = setsockopt(socketParents[i], SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    if (status) {
+      perror("Could not set TCP socket option.\n");
+      return status;
+    }
 
-  // Define addresses to be connected to by each client
-  struct sockaddr_in addrA;
-  addrA.sin_family = AF_INET;
-  addrA.sin_port = htons(CA2SMPort);
-  status = inet_aton(localhost, &addrA.sin_addr);
-  if (!status) {
-    perror("Could not convert host address for parent socket A.\n");
-    return status;
-  }
+    // Define addresses to be connected to by each client
+    struct sockaddr_in addrs[2];
+    addrs[i].sin_family = AF_INET;
+    addrs[i].sin_port = htons(PORTS_TO_CLIENTS[i]);
+    status = inet_aton(localhost, &addrs[i].sin_addr);
+    if (!status) {
+      perror("Could not convert host address for TCP socket.\n");
+      return status;
+    }
 
-  // Bind each socket to the appropriate address
-  status = bind(socketParentA, (struct sockaddr *)&addrA, sizeof(addrA));
-  if (status) {
-    perror("Could not bind parent socket A.\n");
-    return status;
-  }
+    // Bind each socket to the appropriate address
+    status = bind(socketParents[i], (struct sockaddr *)&addrs[i], sizeof(addrs[i]));
+    if (status) {
+      perror("Could not bind TCP socket.\n");
+      return status;
+    }
 
-  // Set each socket to passively listen
-  status = listen(socketParentA, BACKLOG);
-  if (status) {
-    perror("Could not set parent socket to listening state.\n");
-    return status;
+    // Set each socket to passively listen
+    status = listen(socketParents[i], BACKLOG);
+    if (status) {
+      perror("Could not set TCP socket to listening state.\n");
+      return status;
+    }
   }
 
 }
 
-int handleTCPMessage(int sockfd) {
+int handleTCPMessage(int sockfd, unsigned short port) {
   int status = 0;
-
-  checkUserRequest req;
-  recv(sockfd, (checkUserRequest *)&req, sizeof(req), 0);
-  printUserCheck(req.name, 3);
+  
+  clientRequest req;
+  recv(sockfd, (clientRequest *)&req, sizeof(req), 0);
+  switch (req.requestType) {
+    case CLIENT_CHECK:
+      printUserCheck(req.sender, port);
+      break;
+    case CLIENT_TRANSFER:
+      printUserTransfer(req.sender, req.receiver, req.amt, port);
+      break;
+  }
 
   return 0;
 }
@@ -71,16 +81,18 @@ int handleTCPMessage(int sockfd) {
    such receipt, the connection is accepted and appropriate action is taken. */
 int acceptConnections() {
   int status = 0;
-  struct sockaddr incomingAddrA;
-  socklen_t incomingAddrASize;
-  int incomingSocketA;
+  socklen_t incomingAddrSize;
+  struct sockaddr incomingAddrs[2];
+  int incomingSockets[2];
 
-  incomingAddrASize = sizeof(incomingAddrA);
+  incomingAddrSize = sizeof(struct sockaddr);
   while(1) {
-    incomingSocketA = accept(socketParentA, &incomingAddrA, &incomingAddrASize);
-    status = handleTCPMessage(incomingSocketA);
-    if (status) return status;
-    close(incomingSocketA);
+    for (int i = 0; i < 2; i++) {
+      incomingSockets[i] = accept(socketParents[i], &incomingAddrs[i], &incomingAddrSize);
+      status = handleTCPMessage(incomingSockets[i], PORTS_TO_CLIENTS[i]);
+      if (status) return status;
+      close(incomingSockets[i]);
+    }
   }
 }
 

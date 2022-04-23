@@ -53,24 +53,43 @@ int disconnectFromServer() {
 /* Perform user check */
 int userCheck(char* usr) {
   int status = 0;
-  connectToServer();
 
   // Set up message
-  checkUserRequest req;
-  strncpy(req.name, usr, MAX_NAME_LENGTH);
+  clientRequest req;
+  req.requestType = CLIENT_CHECK;
+  strncpy(req.sender, usr, MAX_NAME_LENGTH);
 
+  // Send message
+  connectToServer();
   printUserCheck(usr);
+
   status = send(sockfd, (void *)&req, sizeof(req), 0);
+  if (status) return status;
 
   disconnectFromServer();
-  return 0;
+  return status;
 }
 
+/* Perform transfer operation */
 int userTransfer(char* sender, char* receiver, int amt) {
+  int status = 0;
+
+  // Set up message
+  clientRequest req;
+  req.requestType = CLIENT_TRANSFER;
+  strncpy(req.sender, sender, MAX_NAME_LENGTH);
+  strncpy(req.receiver, receiver, MAX_NAME_LENGTH);
+  req.amt = amt;
+
+  // Send message
   connectToServer();
   printUserTransfer(sender, receiver, amt);
+
+  status = send(sockfd, (void *)&req, sizeof(req), 0);
+  if (status) return status;
+
   disconnectFromServer();
-  return 0;
+  return status;
 }
 
 /* Parses commands, does not error check. */

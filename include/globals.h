@@ -17,7 +17,13 @@
 
 #define MAX_NAME_LENGTH 64
 
-typedef struct CheckUserRequest {
-  char name[MAX_NAME_LENGTH];
-} checkUserRequest;
+#define CLIENT_CHECK 10
+#define CLIENT_TRANSFER 11
+
+typedef struct ClientRequest {
+  unsigned short requestType;
+  char sender[MAX_NAME_LENGTH];
+  char receiver[MAX_NAME_LENGTH]; //optional
+  int amt; //optional
+} clientRequest;
 

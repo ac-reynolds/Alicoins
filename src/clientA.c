@@ -17,6 +17,22 @@ void printUserBalance(char *usr, int balance) {
   printf("The current balance of \"%s\" is: %d alicoins.\n", usr, balance);
 }
 
+void printTransferSuccess(char *sender, char *receiver, int amt, int balance) {
+  printf("\"%s\" successfully transferred %d to \"%s\".\nThe current balance of \"%s\" is %d alicoins.\n", sender, amt, receiver, sender, balance);
+}
+
+void printFailureNotEnoughFunds(char *sender, char *receiver, int amt, int balance) {
+  printf("\"%s\" was unable to transfer %d to \"%s\" because of insufficient balance.\nThe current balance of \"%s\" is: %d alicoins.\n", sender, amt, receiver, sender, balance);
+}
+
+void printFailureUserDNE(char *usr) {
+  printf("Unable to proceed with the transaction as \"%s\" is not part of the network.\n", usr);
+}
+
+void printFailureUsersDNE(char *usr1, char *usr2) {
+  printf("Unable to proceed with the transaction as \"%s\" and \"%s\" are not part of the network.\n", usr1, usr2);
+}
+
 /* Initializes a TCP socket and connect to serverM */
 int connectToServer() {
   int status = 0;
@@ -56,7 +72,11 @@ int requestServerResponse(clientRequest *req, clientResponse *res) {
   }
 
   status = recv(sockfd, res, sizeof(clientResponse), 0);
-  printUserBalance(req->sender, res->result);
+  if (res->senderPresent) {
+    printUserBalance(req->sender, res->result);
+  } else {
+    printFailureUserDNE(req->sender);
+  }
 
   return status;
 }

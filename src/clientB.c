@@ -5,12 +5,32 @@ void printBootUp() {
   printf("The client %c is up and running.\n", clientID);
 }
 
-void printUserCheck(char* usr) {
-  printf("%s sent a balance enquiry request to the main server.\n", usr);
+void printUserCheck(char *usr) {
+  printf("\"%s\" sent a balance enquiry request to the main server.\n", usr);
 }
 
-void printUserTransfer(char* sender, char* receiver, int amt) {
-  printf("%s has requested to transfer %d coins to %s.\n", sender, amt, receiver);
+void printUserTransfer(char *sender, char *receiver, int amt) {
+  printf("\"%s\" has requested to transfer %d coins to \"%s\".\n", sender, amt, receiver);
+}
+
+void printUserBalance(char *usr, int balance) {
+  printf("The current balance of \"%s\" is: %d alicoins.\n", usr, balance);
+}
+
+void printTransferSuccess(char *sender, char *receiver, int amt, int balance) {
+  printf("\"%s\" successfully transferred %d to \"%s\".\nThe current balance of \"%s\" is %d alicoins.\n", sender, amt, receiver, sender, balance);
+}
+
+void printFailureNotEnoughFunds(char *sender, char *receiver, int amt, int balance) {
+  printf("\"%s\" was unable to transfer %d to \"%s\" because of insufficient balance.\nThe current balance of \"%s\" is: %d alicoins.\n", sender, amt, receiver, sender, balance);
+}
+
+void printFailureUserDNE(char *usr) {
+  printf("Unable to proceed with the transaction as \"%s\" is not part of the network.\n", usr);
+}
+
+void printFailureUsersDNE(char *usr1, char *usr2) {
+  printf("Unable to proceed with the transaction as \"%s\" and \"%s\" are not part of the network.\n", usr1, usr2);
 }
 
 /* Initializes a TCP socket and connect to serverM */
@@ -41,6 +61,26 @@ int connectToServer() {
   return status;
 }
 
+/* Perform request/response action. */
+int requestServerResponse(clientRequest *req, clientResponse *res) {
+  int status = 0;
+
+  status = send(sockfd, req, sizeof(clientRequest), 0);
+  if (status < 0) {
+    perror("Could not send request to server");
+    return status;
+  }
+
+  status = recv(sockfd, res, sizeof(clientResponse), 0);
+  if (res->senderPresent) {
+    printUserBalance(req->sender, res->result);
+  } else {
+    printFailureUserDNE(req->sender);
+  }
+
+  return status;
+}
+
 /* Close socket */
 int disconnectFromServer() {
   int status = close(sockfd);
@@ -51,7 +91,7 @@ int disconnectFromServer() {
 }
 
 /* Perform user check */
-int userCheck(char* usr) {
+int doUserCheck(char* usr) {
   int status = 0;
 
   // Set up message
@@ -59,11 +99,13 @@ int userCheck(char* usr) {
   req.requestType = CLIENT_CHECK;
   strncpy(req.sender, usr, MAX_NAME_LENGTH);
 
+  clientResponse res;
+
   // Send message
   connectToServer();
   printUserCheck(usr);
 
-  status = send(sockfd, (void *)&req, sizeof(req), 0);
+  status = requestServerResponse(&req, &res);
   if (status) return status;
 
   disconnectFromServer();
@@ -71,7 +113,7 @@ int userCheck(char* usr) {
 }
 
 /* Perform transfer operation */
-int userTransfer(char* sender, char* receiver, int amt) {
+int doUserTransfer(char* sender, char *receiver, int amt) {
   int status = 0;
 
   // Set up message
@@ -81,11 +123,13 @@ int userTransfer(char* sender, char* receiver, int amt) {
   strncpy(req.receiver, receiver, MAX_NAME_LENGTH);
   req.amt = amt;
 
+  clientResponse res;
+
   // Send message
   connectToServer();
   printUserTransfer(sender, receiver, amt);
 
-  status = send(sockfd, (void *)&req, sizeof(req), 0);
+  status = requestServerResponse(&req, &res);
   if (status) return status;
 
   disconnectFromServer();
@@ -98,11 +142,11 @@ int main(int argc, char** argv) {
     
     // differentiates between the two 1-argument commands
     if (strcmp(argv[1], "TXLIST")) {
-      return userCheck(argv[1]);
+      return doUserCheck(argv[1]);
     }
 
   } else if (argc == 4) {
-    return userTransfer(argv[1], argv[2], strtol(argv[3], NULL, 10));
+    return doUserTransfer(argv[1], argv[2], strtol(argv[3], NULL, 10));
   } 
   return 0;
 }

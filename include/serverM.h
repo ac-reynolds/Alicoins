@@ -17,10 +17,10 @@ const int LISTENER_SOCKET_TYPES[3] = {SOCK_STREAM, SOCK_STREAM, SOCK_DGRAM};
 int socketParents [3];
 
 // Application logic
-int handleClientMessage(int sockfd, unsigned short port, clientResponse *res);
+int handleClientMessage(char servID, int sockfd, unsigned short port, clientResponse *res);
 int doUserCheck(char *name, clientResponse *res);
 void parseTransaction(char *str, transaction *entry);
-int requestBackendResponse(int port, serverRequest *req, transaction *res);
+int requestBackendResponse(char serverID, int port, serverRequest *req, transaction *res);
 
 // Layer 4 utility
 int initializeServerSockets();

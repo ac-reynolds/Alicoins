@@ -54,6 +54,9 @@ typedef struct ClientRequest {
 typedef struct ClientResponse {
   unsigned short responseType;
   int result;
+  unsigned short senderPresent;
+  unsigned short receiverPresent;
+  unsigned short insufficientFunds;
 } clientResponse;
 
 // from serverM to serverX

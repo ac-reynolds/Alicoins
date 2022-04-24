@@ -67,7 +67,6 @@ int sendResponse(serverResponse *res) {
   // Send datagram
   status = sendto(sockets[TALKER], res, sizeof(serverResponse), 0,
     (struct sockaddr *)&mainServAddr, sizeof(struct sockaddr_in));
-  printf("sent res with transaction %s\n", res->transaction);
   if (status < 0) {
     perror("Error sending datagram");
     return status;

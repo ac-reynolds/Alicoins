@@ -6,20 +6,40 @@ void printBootUp() {
 }
 
 void printUserCheck(char* usr, int port) {
-  printf("The main server received input=%s from the client using TCP over port %d.\n", usr, port);
+  printf("The main server received input=\"%s\" from the client using TCP over port %d.\n", usr, port);
 }
 
 void printUserTransfer(char* sender, char* receiver, int amt, int port) {
-  printf("The main server received from %s to transfer %d coins to %s using TCP over port %d.\n", sender, amt, receiver, port);
+  printf("The main server received from \"%s\" to transfer %d coins to \"%s\" using TCP over port %d.\n", sender, amt, receiver, port);
+}
+
+void printBackendRequest(char x) {
+  printf("The main server sent a request to server %c.\n", x);
+}
+
+void printBackendCheckResponse(char x, int port) {
+  printf("The main server received transactions from Server %c using UDP over port %d.\n", x, port);
+}
+
+void printBackendTransferResponse(char x, int port) {
+  printf("The main server received the feedback from server %c using UDP over port %d.\n", x, port);
+}
+
+void printClientCheckResponse(char x) {
+  printf("The main server sent the current balance to client %c.\n", x);
+}
+
+void printClientTransferResponse(char x) {
+  printf("The main server sent the result of the transaction to client %c.\n", x);
 }
 
 /* For debugging/utility */
 void printTransaction(transaction *t) {
-  printf("TX%d: %s -> %s (amt = %d)\n", t->transactionID, t->sender, t->receiver, t->amt);
+  printf("TX%d: \"%s\" -> \"%s\" (amt = %d)\n", t->transactionID, t->sender, t->receiver, t->amt);
 }
 
 /* Interprets the client message. Sets res to the response to be sent back to the client. */
-int handleClientMessage(int sockfd, unsigned short port, clientResponse *res) {
+int handleClientMessage(char serverID, int sockfd, unsigned short port, clientResponse *res) {
   int status = 0;
   
   clientRequest req;
@@ -31,54 +51,67 @@ int handleClientMessage(int sockfd, unsigned short port, clientResponse *res) {
       status = doUserCheck(req.sender, res);
       if (status) return status;
       status = send(sockfd, res, sizeof(clientResponse), 0);
-      if (status) return status;
+      if (status < 0) return status;
+      printClientCheckResponse(serverID);
       break;
     case CLIENT_TRANSFER:
       printUserTransfer(req.sender, req.receiver, req.amt, port);
       break;
   }
 
-  return status;
+  return 0;
+}
+
+/* Retrieves the full log from the backend */
+int getLog(transaction *log, int terminalOperation) {
+  int status = 0;
+
+  // Set up request
+  serverRequest req;
+  req.requestType = SERVER_CHECK;
+  req.terminalOperation = terminalOperation;
+
+  // Fill in entries into table based on backend data
+  int tableSize = 0;
+  for (int i = 0; i < 3; i++) {
+    status = requestBackendResponse(i + INDEX_TO_ID_OFFSET, PORTS_TO_SERVERS[i], &req, log + tableSize);
+    if (status < 0) return status;
+    tableSize += status;
+  }
+
+
+  return tableSize;
 }
 
 /* Perform the check functionality */
 int doUserCheck(char* name, clientResponse *res) {
   int status = 0;
+  int numEntries;
 
   // initialize transaction table
   transaction log[MAX_NUM_TRANSACTIONS];
-
-  // Set up request
-  serverRequest req;
-  req.requestType = SERVER_CHECK;
-  req.terminalOperation = TRUE;
-
-  // Fill in entries into table based on backend data
-  int tableSize = 0;
-  for (int i = 0; i < 1; i++) {
-    status = requestBackendResponse(PORTS_TO_SERVERS[i], &req, log + tableSize);
-    if (status < 0) return status;
-    tableSize += status;
-  }
-
-  printf("parsed %d entries\n", tableSize);
+  numEntries = getLog(log, TRUE);
+  if (numEntries < 0) return status;
 
   // Calculate funds associated with the passed user  
-  int userFunds = INITIAL_ACCOUNT_VALUE; 
-  for (int i = 0; i < tableSize; i++) {
+  int userFunds = INITIAL_ACCOUNT_VALUE;
+  int userFound = 0;
+  for (int i = 0; i < numEntries; i++) {
+    printTransaction(log + i);
     if (!strcmp(name, (log + i)->sender)) {
       userFunds -= (log + i)->amt;
-      printTransaction(log + i);
+      userFound = 1;
     } 
     if (!strcmp(name, (log + i)->receiver)) {
       userFunds += (log + i)->amt;
-      printTransaction(log + i);
+      userFound = 1;
     }
   }
 
   // Fill in response fields
   res->responseType = CLIENT_CHECK;
   res->result = userFunds;
+  res->senderPresent = userFound;
 
   return 0;
 }
@@ -148,7 +181,7 @@ int acceptClientConnections() {
   while(1) {
     for (int i = 0; i < 2; i++) {
       incomingSockets[i] = accept(socketParents[i], &incomingAddrs[i], &incomingAddrSize);
-      status = handleClientMessage(incomingSockets[i], LISTENER_PORTS[i], &res);
+      status = handleClientMessage(i + INDEX_TO_ID_OFFSET, incomingSockets[i], LISTENER_PORTS[i], &res);
       if (status) return status;
       close(incomingSockets[i]);
     }
@@ -156,7 +189,7 @@ int acceptClientConnections() {
 }
 
 /* Fowards the request to the specified server. Records the response in the res field. */
-int requestBackendResponse(int port, serverRequest *req, transaction *log) {
+int requestBackendResponse(char serverID, int port, serverRequest *req, transaction *log) {
   int status = 0;
 
   // Create socket to send UDP datagram
@@ -182,6 +215,7 @@ int requestBackendResponse(int port, serverRequest *req, transaction *log) {
     perror("Error sending datagram to backend");
     return status;
   }
+  printBackendRequest(serverID);
 
   // Await response, filling out data based on type of request sent
   struct sockaddr incomingAddr;
@@ -208,6 +242,12 @@ int requestBackendResponse(int port, serverRequest *req, transaction *log) {
       memcpy(log + numEntries, &t, sizeof(t));
     }
     numEntries++;
+  }
+
+  if (res.responseType == SERVER_CHECK) {
+    printBackendCheckResponse(serverID, port);
+  } else if (res.responseType == SERVER_TRANSFER) {
+    printBackendTransferResponse(serverID, port);
   }
 
   status = close(socketOut);

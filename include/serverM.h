@@ -2,6 +2,8 @@
 
 #define BACKLOG 10
 
+const char TXLIST_FILE_PATH[] = "src/alichain.txt";
+
 typedef struct Transaction {
   int transactionID;
   char sender[MAX_NAME_LENGTH];
@@ -25,6 +27,7 @@ int pushTransaction(transaction *t);
 
 int doUserCheck(char *name, clientResponse *res);
 int doUserTransfer(char *sender, char *receiver, int amt, clientResponse *res);
+int doTXLIST();
 
 void parseTransaction(char *str, transaction *entry);
 void stringifyTransaction(transaction *t, char *str);

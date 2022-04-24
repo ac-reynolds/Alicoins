@@ -30,6 +30,7 @@
 // Between client and main server
 #define CLIENT_CHECK 1
 #define CLIENT_TRANSFER 2
+#define CLIENT_TXLIST 3
 
 // Between main server and backend
 #define SERVER_CHECK 1

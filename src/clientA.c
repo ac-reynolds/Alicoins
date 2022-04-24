@@ -2,7 +2,7 @@
 
 /* Messages */
 void printBootUp() {
-  printf("The client %c is up and running.\n", clientID);
+  printf("The client %c is up and running.\n", CLIENT_ID);
 }
 
 void printUserCheck(char *usr) {
@@ -33,6 +33,10 @@ void printFailureUsersDNE(char *usr1, char *usr2) {
   printf("Unable to proceed with the transaction as \"%s\" and \"%s\" are not part of the network.\n", usr1, usr2);
 }
 
+void printUserTXLIST() {
+  printf("Client%c sent a sorted list request to the main server.\n", CLIENT_ID);
+}
+
 /* Initializes a TCP socket and connect to serverM */
 int connectToServer() {
   int status = 0;
@@ -45,7 +49,7 @@ int connectToServer() {
 
   struct sockaddr_in servAddr;
   servAddr.sin_family = AF_INET;
-  servAddr.sin_port = htons(assignedPort);
+  servAddr.sin_port = htons(ASSIGNED_PORT);
   status = inet_aton(localhost, &servAddr.sin_addr);
   if (!status) {
     perror("Could not convert host address.\n");
@@ -152,6 +156,26 @@ int doUserTransfer(char* sender, char *receiver, int amt) {
   return status;
 }
 
+int doTXLIST() {
+  int status = 0;
+
+  // Set up message
+  clientRequest req;
+  req.requestType = CLIENT_TXLIST;
+
+  clientResponse res;
+
+  // Send message
+  connectToServer();
+  printUserTXLIST();
+
+  status = requestServerResponse(&req, &res);
+  if (status) return status;
+
+  disconnectFromServer();
+  return status;
+}
+
 /* Parses commands, does not error check. */
 int main(int argc, char** argv) {
   if (argc == 2) {
@@ -159,6 +183,8 @@ int main(int argc, char** argv) {
     // differentiates between the two 1-argument commands
     if (strcmp(argv[1], "TXLIST")) {
       return doUserCheck(argv[1]);
+    } else {
+      return doTXLIST();
     }
 
   } else if (argc == 4) {

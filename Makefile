@@ -28,6 +28,6 @@ $(objects): %: $(SDIR)/%.c
 .PHONY: clean
 
 clean:
-	rm -f $(objects)
+	rm -f $(objects) $(SDIR)/alichain.txt
 
 FORCE: ;

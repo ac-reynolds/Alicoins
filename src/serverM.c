@@ -13,6 +13,14 @@ void printUserTransfer(char* sender, char* receiver, int amt, int port) {
   printf("The main server received from \"%s\" to transfer %d coins to \"%s\" using TCP over port %d.\n", sender, amt, receiver, port);
 }
 
+void printUserTXLIST() {
+  printf("A TXLIST request has been received.\n");
+}
+
+void printTXLISTReady() {
+  printf("The sorted file is up and ready.\n");
+}
+
 void printBackendRequest(char x) {
   printf("The main server sent a request to server %c.\n", x);
 }
@@ -48,26 +56,42 @@ int handleClientMessage(char serverID, int sockfd, unsigned short port, clientRe
   switch (req.requestType) {
     case CLIENT_CHECK:
       printUserCheck(req.sender, port);
+      // Get relevant information and perform calculation
       status = doUserCheck(req.sender, res);
       if (status) return status;
+      // Return response to client
       status = send(sockfd, res, sizeof(clientResponse), 0);
       if (status < 0) return status;
+
       printClientCheckResponse(serverID);
       break;
+
     case CLIENT_TRANSFER:
       printUserTransfer(req.sender, req.receiver, req.amt, port);
+      // Get relevant information and perform calculation
       status = doUserTransfer(req.sender, req.receiver, req.amt, res);
       if (status) return status;
+      // Return response to client
       status = send(sockfd, res, sizeof(clientResponse), 0);
       if (status < 0) return status;
+
       printClientTransferResponse(serverID);
+      break;
+
+    case CLIENT_TXLIST:
+      printUserTXLIST();
+      // Get relevant information and perform calculation
+      status = doTXLIST();
+      if (status) return status;
+      
+      printTXLISTReady();
       break;
   }
 
   return 0;
 }
 
-/* Retrieves the full log from the backend */
+/* Retrieves the full log from the backend. Returns the total number of transactions in the log. */
 int getLog(transaction *log, int terminalOperation) {
   int status = 0;
 
@@ -200,6 +224,55 @@ int doUserTransfer(char *sender, char *receiver, int amt, clientResponse *res) {
 
   return 0;
 }
+
+void swapTransactions(transaction *t1, transaction *t2) {
+  transaction temp;
+  memcpy(&temp, t1, sizeof(transaction));
+  memcpy(t1, t2, sizeof(transaction));
+  memcpy(t2, &temp, sizeof(transaction));
+}
+
+/* Perform the TXLIST operation  */
+int doTXLIST() {
+  int status = 0;
+  int numEntries;
+  char lineBuffer[MAX_TRANSACTION_LENGTH];
+
+  // initialize transaction table
+  transaction log[MAX_NUM_TRANSACTIONS];
+  numEntries = getLog(log, TRUE);
+
+  /* SORT */
+
+  // Uses selection sort (assuming small enough # of entries)
+  
+  for (int i = 0; i < numEntries; i++) {
+    // Find the entry that belongs at idx i (has ID=i+1)
+    for (int j = i; j < numEntries; j++) {
+      if ((log + j)->transactionID == i + 1) {
+        swapTransactions(log + i, log + j);
+        break;
+      }
+    }
+  }
+
+  /* END SORTING */
+
+  // Write transactions to file
+  FILE *f = fopen(TXLIST_FILE_PATH, "w");
+  for (int i = 0; i < numEntries; i++) {
+    stringifyTransaction((log + i), lineBuffer);
+    fprintf(f, "%s\n", lineBuffer);
+    //printTransaction(log + i);
+  }
+
+  status = fclose(f);
+  if (status) return status;
+
+  return 0;
+}
+
+
 
 /* Initializes both sockets for incoming communication, but does not start accepting connections. */
 int initializeServerSockets() {

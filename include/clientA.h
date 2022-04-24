@@ -1,7 +1,7 @@
 #include "globals.h"
 
-const char clientID = 'A';
-const int assignedPort = CA2SMPort;
+const char CLIENT_ID = 'A';
+const int ASSIGNED_PORT = CA2SMPort;
 
 // fd for outgoing socket
 int sockfd;
@@ -14,3 +14,4 @@ int disconnectFromServer();
 // Application logic
 int doUserCheck(char *usr);
 int doUserTransfer(char *sender, char *receiver, int amt);
+int doTXLIST();

@@ -61,6 +61,7 @@ int initializeSockets() {
   return status;
 }
 
+/* sends response to main server */
 int sendResponse(serverResponse *res) {
   int status = 0;
 
@@ -75,6 +76,7 @@ int sendResponse(serverResponse *res) {
   return status;
 }
 
+/* */
 int handleRequest(serverRequest* req) {
   int status = 0;
   char line[MAX_TRANSACTION_LENGTH] = "5 Chinmay Oliver 129\n";
@@ -112,7 +114,25 @@ int handleRequest(serverRequest* req) {
       
       if (req->terminalOperation) printResponse();
       break;
+
     case SERVER_TRANSFER:
+      printRequest();
+
+      res.responseType = SERVER_TRANSFER;
+      res.confirmation = TRUE;
+      res.finalResponse = TRUE;
+
+      // Get file contents, one line at a time
+      f = fopen(BLOCK_FILE_NAME, "a");
+      if (f < 0) return -1;
+
+      fprintf(f, "%s\n", req->transaction);
+
+      status = fclose(f);
+      if (status) return status;
+
+      status = sendResponse(&res);
+      printResponse();
       break;
   }  
   
@@ -128,7 +148,7 @@ int receiveRequests() {
 
   // Loop forever, accepting incoming request from main server
   while(1) {
-    status = recvfrom(sockets[LISTENER], &req, sizeof(req), 0, &incomingAddr, &incomingAddrSize);
+    status = recvfrom(sockets[LISTENER], &req, sizeof(serverRequest), 0, &incomingAddr, &incomingAddrSize);
     if (status < 0) return status;
     status = handleRequest(&req);
     if (status) return status;

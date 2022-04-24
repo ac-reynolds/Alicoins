@@ -56,6 +56,11 @@ int handleClientMessage(char serverID, int sockfd, unsigned short port, clientRe
       break;
     case CLIENT_TRANSFER:
       printUserTransfer(req.sender, req.receiver, req.amt, port);
+      status = doUserTransfer(req.sender, req.receiver, req.amt, res);
+      if (status) return status;
+      status = send(sockfd, res, sizeof(clientResponse), 0);
+      if (status < 0) return status;
+      printClientTransferResponse(serverID);
       break;
   }
 
@@ -79,8 +84,30 @@ int getLog(transaction *log, int terminalOperation) {
     tableSize += status;
   }
 
-
   return tableSize;
+}
+
+/* Push transaction */
+int pushTransaction(transaction *t) {
+  int status = 0;
+  int choice;
+  transaction *unused;
+
+  // Set up request
+  serverRequest req;
+  req.requestType = SERVER_TRANSFER;
+  req.terminalOperation = TRUE;
+  stringifyTransaction(t, req.transaction);
+
+  // Pick a random server to send to
+  choice = rand() % 3;
+
+  // Fire off request, await response
+  status = requestBackendResponse(choice + INDEX_TO_ID_OFFSET,
+    PORTS_TO_SERVERS[choice], &req, unused);
+  if (status < 0) return status;
+  
+  return 0;
 }
 
 /* Perform the check functionality */
@@ -97,7 +124,7 @@ int doUserCheck(char* name, clientResponse *res) {
   int userFunds = INITIAL_ACCOUNT_VALUE;
   int userFound = 0;
   for (int i = 0; i < numEntries; i++) {
-    printTransaction(log + i);
+    //printTransaction(log + i);
     if (!strcmp(name, (log + i)->sender)) {
       userFunds -= (log + i)->amt;
       userFound = 1;
@@ -116,6 +143,63 @@ int doUserCheck(char* name, clientResponse *res) {
   return 0;
 }
 
+/* Perform the transfer operation  */
+int doUserTransfer(char *sender, char *receiver, int amt, clientResponse *res) {
+  int status = 0;
+  int numEntries;
+
+  // initialize transaction table
+  transaction log[MAX_NUM_TRANSACTIONS];
+  numEntries = getLog(log, FALSE);
+  if (numEntries < 0) return status;
+
+  // Check to see that at sender and receiver both appear at least once
+  int senderPresent = 0;
+  int receiverPresent = 0;
+  int senderFunds = INITIAL_ACCOUNT_VALUE;
+
+  for (int i = 0; i < numEntries; i++) {
+
+    // Verify that sender exists and tally up funds
+    if (!strcmp(sender, (log + i)->sender)) {
+      senderPresent = 1;
+      senderFunds -= (log + i)->amt;
+    }
+    if (!strcmp(sender, (log + i)->receiver)) {
+      senderPresent = 1;
+      senderFunds += (log + i)->amt;
+    }
+
+    // Just verify that the receiver exists
+    if (!strcmp(receiver, (log + i)->sender) || !strcmp(receiver, (log + i)->receiver)) {
+      receiverPresent = 1;
+    }
+    //printTransaction(log + i);
+  }
+
+  // Fill in response fields
+  res->responseType = CLIENT_TRANSFER;
+  res->senderPresent = senderPresent;
+  res->receiverPresent = receiverPresent;
+  res->insufficientFunds = senderFunds < amt;
+  res->result = res->insufficientFunds ? senderFunds : senderFunds - amt;  
+
+  // send transaction if it passes error cases
+  transaction t; 
+  if (senderPresent && receiverPresent && !res->insufficientFunds) {
+
+    // Transaction OK
+    t.transactionID = numEntries + 1;
+    strcpy(t.sender, sender);
+    strcpy(t.receiver, receiver);
+    t.amt = amt;
+    status = pushTransaction(&t);
+    if (status) return status;    
+
+  }
+
+  return 0;
+}
 
 /* Initializes both sockets for incoming communication, but does not start accepting connections. */
 int initializeServerSockets() {
@@ -201,6 +285,7 @@ int requestBackendResponse(char serverID, int port, serverRequest *req, transact
 
   // Convert serverM host
   struct sockaddr_in servAddr;
+  servAddr.sin_family = AF_INET;
   servAddr.sin_port = htons(port);
   status = inet_aton(localhost, &servAddr.sin_addr);
   if (!status) {
@@ -209,13 +294,13 @@ int requestBackendResponse(char serverID, int port, serverRequest *req, transact
   }
 
   // Send datagram
-  status = sendto(socketOut, req, sizeof(req), 0, 
+  status = sendto(socketOut, req, sizeof(serverRequest), 0, 
     (struct sockaddr *)&servAddr, sizeof(struct sockaddr_in));
   if (status < 0) {
     perror("Error sending datagram to backend");
     return status;
   }
-  printBackendRequest(serverID);
+  if (req->terminalOperation) printBackendRequest(serverID);
 
   // Await response, filling out data based on type of request sent
   struct sockaddr incomingAddr;
@@ -225,6 +310,7 @@ int requestBackendResponse(char serverID, int port, serverRequest *req, transact
   serverResponse res;
   transaction t;
 
+    // For anything but a transfer push, we need to fill up the log
   while (1) {
     status = recvfrom(socketParents[2], &res, sizeof(res), 
       0, &incomingAddr, &incomingAddrSize);
@@ -232,7 +318,7 @@ int requestBackendResponse(char serverID, int port, serverRequest *req, transact
       perror("Error receiving UDP message");
       return status;
     }
-    
+  
     // Process message. Continue reading messages until we arrive at a message
     // with "finalResponse" field set to true.
     if (res.finalResponse) break;
@@ -244,7 +330,8 @@ int requestBackendResponse(char serverID, int port, serverRequest *req, transact
     numEntries++;
   }
 
-  if (res.responseType == SERVER_CHECK) {
+  if (!req->terminalOperation) {
+  } else if(res.responseType == SERVER_CHECK) {
     printBackendCheckResponse(serverID, port);
   } else if (res.responseType == SERVER_TRANSFER) {
     printBackendTransferResponse(serverID, port);
@@ -270,6 +357,12 @@ void parseTransaction(char *str, transaction *entry) {
   strcpy(entry->receiver, token);
   token = strtok(NULL, " ");
   entry->amt = atoi(token);
+}
+
+/* Takes a passed transaction and converts it into a string. */
+void stringifyTransaction(transaction *t, char *str) {
+  //printTransaction(t);
+  sprintf(str, "%d %s %s %d", t->transactionID, t->sender, t->receiver, t->amt);
 }
 
 /* Main driver */

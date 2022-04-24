@@ -72,13 +72,9 @@ int requestServerResponse(clientRequest *req, clientResponse *res) {
   }
 
   status = recv(sockfd, res, sizeof(clientResponse), 0);
-  if (res->senderPresent) {
-    printUserBalance(req->sender, res->result);
-  } else {
-    printFailureUserDNE(req->sender);
-  }
+  if (status < 0) return status;
 
-  return status;
+  return 0;
 }
 
 /* Close socket */
@@ -108,6 +104,13 @@ int doUserCheck(char* usr) {
   status = requestServerResponse(&req, &res);
   if (status) return status;
 
+  // Print appropriate response based on message
+  if (res.senderPresent) {
+    printUserBalance(req.sender, res.result);
+  } else {
+    printFailureUserDNE(req.sender);
+  }
+
   disconnectFromServer();
   return status;
 }
@@ -131,6 +134,19 @@ int doUserTransfer(char* sender, char *receiver, int amt) {
 
   status = requestServerResponse(&req, &res);
   if (status) return status;
+
+  // Print appropriate response based on message
+  if (!res.senderPresent && !res.receiverPresent) {
+    printFailureUsersDNE(req.sender, req.receiver);
+  } else if (!res.senderPresent) {
+    printFailureUserDNE(req.sender);
+  } else if (!res.receiverPresent) {
+    printFailureUserDNE(req.receiver);
+  } else if (res.insufficientFunds) {
+    printFailureNotEnoughFunds(req.sender, req.receiver, req.amt, res.result);
+  } else { // success 
+    printTransferSuccess(req.sender, req.receiver, req.amt, res.result);
+  }
 
   disconnectFromServer();
   return status;

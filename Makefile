@@ -4,15 +4,11 @@
 
 SDIR=src
 CC=gcc
-BLOCKDIR=blocks
 DEPS=include
 
 objects = serverM serverA serverB serverC clientA clientB
 
 all: clean $(objects)
-
-blocks: FORCE
-	cp $(BLOCKDIR)/* $(SDIR)/
 
 copies: FORCE
 	cp $(SDIR)/serverA.c $(SDIR)/serverB.c

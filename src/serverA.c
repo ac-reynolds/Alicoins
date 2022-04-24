@@ -18,10 +18,12 @@ int initializeSockets() {
   int status = 0;
 
   // Create parent socket
-  sockets[LISTENER] = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sockets[LISTENER] < 0) {
-   perror("Could not create UDP socket.\n");
-   return sockets[LISTENER];
+  for (int i = 0; i < 2; i++) {
+    sockets[i] = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockets[i] < 0) {
+      perror("Could not create UDP socket.\n");
+      return sockets[i];
+    }
   }
 
   // Set socket addr to be reused (no zombies!)
@@ -31,7 +33,15 @@ int initializeSockets() {
     perror("Could not set UDP socket option.\n");
   }
 
-  // Define address to be connected to
+  // Convert host address at main server
+  mainServAddr.sin_port = htons(SX2SMPort);
+  status = inet_aton(localhost, &mainServAddr.sin_addr);
+  if (!status) {
+    perror("Could not convert main server host address");
+    return status;
+  }  
+
+  // Convert host address at this server
   struct sockaddr_in addr;
   addr.sin_family = AF_INET;
   addr.sin_port = htons(PORT);
@@ -51,55 +61,65 @@ int initializeSockets() {
   return status;
 }
 
-int sendResponse(void *res, int resSize) {
+int sendResponse(serverResponse *res) {
   int status = 0;
 
-  // Create socket to send UDP datagram
-  int socketOut = socket(AF_INET, SOCK_DGRAM, 0);
-  if (socketOut < 0) {
-    perror("Could not creat socket");
-    return socketOut;
-  }
-
-  // Convert host address
-  struct sockaddr_in servAddr;
-  servAddr.sin_port = htons(SX2SMPort);
-  status = inet_aton(localhost, &servAddr.sin_addr);
-  if (!status) {
-    perror("Could not convert host address");
-    return status;
-  }
-
   // Send datagram
-  status = sendto(socketOut, res, resSize, 0,
-    (struct sockaddr *)&servAddr, sizeof(struct sockaddr_in));
+  status = sendto(sockets[TALKER], res, sizeof(serverResponse), 0,
+    (struct sockaddr *)&mainServAddr, sizeof(struct sockaddr_in));
   if (status < 0) {
     perror("Error sending datagram");
     return status;
   }
 
-  // Close socket
-  status = close(socketOut);
-  if (status) {
-    perror("Error closing socket");
-    return status;
-  }
-}
-
-int handleResponse(serverRequest* req) {
-  int status = 0;
-  char word[20] = "go to sleep\n";
-  if (req->terminalOperation) {
-    printRequest();
-    status = sendResponse((void *)word, sizeof(word));
-    if (status) return status;
-    printResponse();
-  } else printf("processing nonterminal operation.\n");
-  
   return status;
 }
 
-int acceptConnections() {
+int handleRequest(serverRequest* req) {
+  int status = 0;
+  char line[MAX_TRANSACTION_LENGTH] = "5 Chinmay Oliver 129\n";
+  FILE *f;
+  char word2[60] = "1 Racheal John 45";
+  serverResponse res;
+
+  switch (req->requestType) {
+    case SERVER_CHECK:
+      if (req->terminalOperation) printRequest();
+
+      // Set response fields
+      res.responseType = SERVER_CHECK;
+      res.finalResponse = FALSE;
+
+      // Get file contents, one line at a time
+      f = fopen(BLOCK_FILE_NAME, "r");
+      if (f < 0) return -1;
+
+      // Read through entire text file, sending each non-empty line to the main server
+      while (fgets(res.transaction, sizeof(line), f) != NULL) {
+        if (res.transaction[0] == '\0' || res.transaction[0] == '\n') continue;
+
+        // Send full transaction line
+        status = sendResponse(&res);
+        if (status < 0) return status;
+      }
+      status = fclose(f);
+      if (status) return status;
+
+      // Send final message to tell server to stop waiting for more transactions
+      res.finalResponse = TRUE;
+      status = sendResponse(&res);
+      if (status < 0) return status;
+      
+      if (req->terminalOperation) printResponse();
+      break;
+    case SERVER_TRANSFER:
+      break;
+  }  
+  
+  return 0;
+}
+
+int receiveRequests() {
   int status = 0;
   socklen_t incomingAddrSize;
   struct sockaddr incomingAddr;
@@ -110,7 +130,7 @@ int acceptConnections() {
   while(1) {
     status = recvfrom(sockets[LISTENER], &req, sizeof(req), 0, &incomingAddr, &incomingAddrSize);
     if (status < 0) return status;
-    status = handleResponse(&req);
+    status = handleRequest(&req);
     if (status) return status;
   }
   return status;
@@ -125,7 +145,7 @@ int main() {
 
   printBootUp();
 
-  status = acceptConnections();
+  status = receiveRequests();
   if (status) return status;
 
   return status;

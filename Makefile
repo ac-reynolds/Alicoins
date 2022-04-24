@@ -4,11 +4,12 @@
 
 SDIR=src
 CC=gcc
+BLOCKDIR=blocks
 DEPS=include
 
 objects = serverM serverA serverB serverC clientA clientB
 
-all: $(objects)
+all: clean $(objects)
 
 $(objects): %: $(SDIR)/%.c
 	$(CC) -o $@ $< -I$(DEPS)
@@ -16,4 +17,4 @@ $(objects): %: $(SDIR)/%.c
 .PHONY: clean
 
 clean:
-	rm -f $(objects)
+	rm -f $(objects); cp $(BLOCKDIR)/* $(SDIR)/

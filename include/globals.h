@@ -28,19 +28,19 @@
 #define MAX_TRANSACTION_LENGTH 1024
 
 // Between client and main server
-#define CLIENT_CHECK 10
-#define CLIENT_TRANSFER 11
+#define CLIENT_CHECK 1
+#define CLIENT_TRANSFER 2
 
 // Between main server and backend
-#define SERVER_CHECK 20
-#define SERVER_TRANSFER 21
+#define SERVER_CHECK 1
+#define SERVER_TRANSFER 2
 
 // For backend UDP connections
 #define TALKER 0
 #define LISTENER 1
 
 #define MAX_NUM_TRANSACTIONS 3000
-#define MAX_FILE_LENGTH 65507
+#define INITIAL_ACCOUNT_VALUE 1000
 
 // from clientX to serverM
 typedef struct ClientRequest {
@@ -63,4 +63,10 @@ typedef struct ServerRequest {
   char transaction[MAX_TRANSACTION_LENGTH]; // optional, should include newline suffix
 } serverRequest;
 
-// server responses are just char[] and int
+// from serverX to serverM, many of these responses may be sent
+typedef struct ServerResponse {
+  unsigned short responseType;
+  unsigned short confirmation; // after a transaction is successfully added
+  unsigned short finalResponse; // to indicate that no more bits should be listened for
+  char transaction[MAX_TRANSACTION_LENGTH];
+} serverResponse;

@@ -1,9 +1,9 @@
 #include "globals.h"
 
-const char SERVER_ID = 'A';
-const int PORT = SM2SAPort;
+const char SERVER_ID = 'B';
+const int PORT = SM2SBPort;
 const int BACKLOG = 5;
-const char BLOCK_FILE_NAME[] = "src/block1.txt";
+const char BLOCK_FILE_NAME[] = "src/block2.txt";
 
 int sockets[2];
 struct sockaddr_in mainServAddr;

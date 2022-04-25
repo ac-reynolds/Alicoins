@@ -37,6 +37,19 @@ void printUserTXLIST() {
   printf("Client%c sent a sorted list request to the main server.\n", CLIENT_ID);
 }
 
+void printUserStats(char *usr) {
+  printf("\"%s\" sent a statistics enquiry request to the main server.\n", usr);
+}
+
+void printStatsHeader(char *usr) {
+  printf("\"%s\" statistics are the following.:\n", usr);
+  printf("  Rank --- Username --- #TXWithUser --- XferAmt\n"); 
+}
+
+void printStatsLine(statEntry *stats) {
+  printf(" %-6d | %-10s | %-13d | %-8d\n", stats->rank, stats->username, stats->numTX, stats->netBalance);
+}
+
 /* Initializes a TCP socket and connect to serverM */
 int connectToServer() {
   int status = 0;
@@ -156,6 +169,7 @@ int doUserTransfer(char* sender, char *receiver, int amt) {
   return status;
 }
 
+/* Send message for creating transaction list */
 int doTXLIST() {
   int status = 0;
 
@@ -176,6 +190,39 @@ int doTXLIST() {
   return status;
 }
 
+/* Send message for stats check */
+int doStats(char *usr) {
+  int status = 0;
+
+  // Set up message
+  clientRequest req;
+  req.requestType = CLIENT_STATS;
+  strcpy(req.sender, usr);
+
+  clientResponse res;
+
+  // Send message
+  connectToServer();
+  printUserStats(usr);
+
+  status = requestServerResponse(&req, &res);
+  if (status) return status;
+
+  disconnectFromServer();
+
+  if (res.numUsers == 0) {
+    printFailureUserDNE(usr);
+    return 0;
+  }
+
+  printStatsHeader(usr);
+  for (int i = 0; i < res.numUsers; i++) {
+    printStatsLine(res.userStats + i);
+  }
+
+  return status;
+}
+
 /* Parses commands, does not error check. */
 int main(int argc, char** argv) {
   if (argc == 2) {
@@ -187,6 +234,8 @@ int main(int argc, char** argv) {
       return doTXLIST();
     }
 
+  } else if (argc == 3) {
+    return doStats(argv[1]);
   } else if (argc == 4) {
     return doUserTransfer(argv[1], argv[2], strtol(argv[3], NULL, 10));
   } 

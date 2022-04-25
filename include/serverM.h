@@ -28,6 +28,7 @@ int pushTransaction(transaction *t);
 int doUserCheck(char *name, clientResponse *res);
 int doUserTransfer(char *sender, char *receiver, int amt, clientResponse *res);
 int doTXLIST();
+int doUserStats(char *usr, clientResponse *res);
 
 void parseTransaction(char *str, transaction *entry);
 void stringifyTransaction(transaction *t, char *str);

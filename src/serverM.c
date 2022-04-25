@@ -41,9 +41,21 @@ void printClientTransferResponse(char x) {
   printf("The main server sent the result of the transaction to client %c.\n", x);
 }
 
+void printUserStats(char *usr) {
+  printf("The main server received a request for \"%s\"'s stats.\n", usr);
+}
+
+void printUserStatsResponse(char *usr) {
+  printf("The main server returned \"%s\"'s stats.\n", usr);
+}
+
 /* For debugging/utility */
 void printTransaction(transaction *t) {
   printf("TX%d: \"%s\" -> \"%s\" (amt = %d)\n", t->transactionID, t->sender, t->receiver, t->amt);
+}
+
+void printStatsEntry(statEntry *e) {
+  printf("Rank: %d, Name: %s, NumTX: %d, Amt: %d\n", e->rank, e->username, e->numTX, e->netBalance);
 }
 
 /* Interprets the client message. Sets res to the response to be sent back to the client. */
@@ -85,6 +97,21 @@ int handleClientMessage(char serverID, int sockfd, unsigned short port, clientRe
       if (status) return status;
       
       printTXLISTReady();
+      break;
+
+    case CLIENT_STATS:
+      printf("what\n");
+      printUserStats(req.sender);
+      
+      // Response to request
+      status = doUserStats(req.sender, res);
+      if (status) return status;
+      
+      // Return response to client
+      status = send(sockfd, res, sizeof(clientResponse), 0);
+      if (status < 0) return status;
+ 
+      printUserStatsResponse(req.sender);
       break;
   }
 
@@ -260,6 +287,11 @@ int doTXLIST() {
 
   // Write transactions to file
   FILE *f = fopen(TXLIST_FILE_PATH, "w");
+  if (f < 0) {
+    perror("Could not open back-end transaction file.\n");
+    return -1;
+  } 
+
   for (int i = 0; i < numEntries; i++) {
     stringifyTransaction((log + i), lineBuffer);
     fprintf(f, "%s\n", lineBuffer);
@@ -272,7 +304,81 @@ int doTXLIST() {
   return 0;
 }
 
+/* Swap function */
+void swapStatEntries(statEntry *e1, statEntry *e2) {
+  statEntry temp;
+  memcpy(&temp, e1, sizeof(statEntry));
+  memcpy(e1, e2, sizeof(statEntry));
+  memcpy(e2, &temp, sizeof(statEntry));
+}
 
+/* Add user to stat chart */
+void addToStats(statEntry *stats, int *numUsers, char *usr, int netChange) {
+
+  // Perform linear search to try and find user
+  for (int i = 0; i < *numUsers; i++) {
+    if (!strcmp((stats + i)->username, usr)) {
+      (stats + i)->numTX++;
+      (stats + i)->netBalance += netChange;
+      return;
+    }
+  }
+  strcpy((stats + *numUsers)->username, usr);
+  (stats + *numUsers)->numTX = 1;
+  (stats + *numUsers)->netBalance = netChange;
+  (*numUsers)++;
+}
+
+/* Perform the stats operation  */
+int doUserStats(char *usr, clientResponse *res) {
+  int status = 0;
+  int numTransactions;
+  int numUsers = 0;
+  char lineBuffer[MAX_TRANSACTION_LENGTH];
+  statEntry stats[MAX_USERS_IN_NETWORK];
+
+  // initialize transaction table
+  transaction log[MAX_NUM_TRANSACTIONS];
+  numTransactions = getLog(log, TRUE);
+
+  /* ADD UP STATS */
+  for (int i = 0; i < numTransactions; i++) {
+
+    // If user is sender, add receiver to list
+    if (!strcmp(usr, log[i].sender)) {
+      addToStats(stats, &numUsers, log[i].receiver, -log[i].amt);
+    }
+
+    // If user is receiver, add sender to list
+    if (!strcmp(usr, log[i].receiver)) {
+      addToStats(stats, &numUsers, log[i].sender, log[i].amt);
+    }
+  }
+
+  /* SORTING */
+
+  // Uses selection sort  
+  int maxIdx;
+  for (int i = 0; i < numUsers; i++) {
+
+    // Find minimal element in unsorted region
+    maxIdx = i;
+    for (int j = i; j < numUsers; j++) {
+      if (stats[j].numTX > stats[maxIdx].numTX) {
+        maxIdx = j;
+      }
+    }
+    swapStatEntries(stats + i, stats + maxIdx);
+
+    // Set ranks according to position in stats
+    stats[i].rank = i + 1;
+  }
+
+  // Copy stats into response
+  memcpy(res->userStats, stats, numUsers * sizeof(statEntry));
+  res->numUsers = numUsers;
+  return 0;
+}
 
 /* Initializes both sockets for incoming communication, but does not start accepting connections. */
 int initializeServerSockets() {

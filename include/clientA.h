@@ -15,3 +15,4 @@ int disconnectFromServer();
 int doUserCheck(char *usr);
 int doUserTransfer(char *sender, char *receiver, int amt);
 int doTXLIST();
+int doStats(char *usr);

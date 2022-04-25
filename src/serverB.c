@@ -94,7 +94,10 @@ int handleRequest(serverRequest* req) {
 
       // Get file contents, one line at a time
       f = fopen(BLOCK_FILE_NAME, "r");
-      if (f < 0) return -1;
+      if (f == NULL) {
+        perror("Could not open src/block#.txt");
+        return -1;
+      }
 
       // Read through entire text file, sending each non-empty line to the main server
       while (fgets(res.transaction, sizeof(line), f) != NULL) {
@@ -124,7 +127,10 @@ int handleRequest(serverRequest* req) {
 
       // Get file contents, one line at a time
       f = fopen(BLOCK_FILE_NAME, "a");
-      if (f < 0) return -1;
+      if (f == NULL) {
+        perror("Could not open src/block#.txt");
+        return -1;
+      }
 
       fprintf(f, "%s\n", req->transaction);
 

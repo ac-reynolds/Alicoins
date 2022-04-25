@@ -5,9 +5,10 @@ a. Adam Reynolds
 
 b. 2433-2688-40
 
-c. I have completed all three phases of the assignment. I implemented two
-   client programs, a main server program, and three back-end server programs
-   as specified in the assignment. 
+c. I have completed all core three phases of the assignment, as well as the
+   extra credit. I implemented two client programs, a main server program, and
+   three back-end server programs as specified in the assignment. I implemented
+   all required commands: balance checking, transfer, TXLIST, and stats.
 
 d. I have 6 .c files in the src/ folder, corresponding to the 6 applications to
    be run. clientA.c and clientB.c are the client files, serverM.c is the main
@@ -29,17 +30,43 @@ g. There are several things to note about my project, some of which are covered
    1. I could not run my virtual machine on my computer, so I am using a rented
       aws ubuntu 16.04 instance, as recommended by an instructor in piazza post
       @10. I have compiled and executed my code only on this machine.
+      Version information is as follows:
+
+       $ lsb_release -a
+       No LSB modules are available.
+       Distributor ID: Ubuntu
+       Description:    Ubuntu 16.04.7 LTS
+       Release:        16.04
+       Codename:       xenial
  
-   2. My back-end servers are only guaranteed to work on starter block files
-      that end in a newline character. This is in line with an instructor's
-      response on piazza post @390, but not in line with the example starter
-      blocks (block3.txt does not end in a newline character).
+   2. My back-end servers are only guaranteed to work correctly on starter
+      block files that end in a newline character. This is in line with an
+      instructor's response on piazza post @390, but not in line with the
+      example starter blocks (block3.txt does not end in a newline character).
 
    3. All .txt files, which are "block1.txt", "block2.txt", "block3.txt", and 
       "alichain.txt" must be in the src/ folder to be read and written to. This
       is in line with the instructor response in piazza post @428.
 
-   4. Since the log files stored in the back-end could potentially be very
+   4. The main server will not listen on multiple sockets. Instead, it will 
+      only accept messages in the following order: A, B, A, B, A, ..., as
+      specified in piazza post @412.
+
+   5. I have added several printout statements on the main server that were not
+      in the writeup. These are:
+        a. A message printed when the TXLIST command is received. 
+        b. A message printed after the "alichain.txt" file is generated.
+        c. A message printed when the server receives a request for stats.
+        d. A message printed when the server returns stats to the client.
+      These messages are optional, as in pizza post @292.
+
+   6. The "transfer" operation involves up to two messages from the main server
+      to each backend server: once to query information, and once to send the
+      transaction itself. For this operation, the first request will not result
+      in printout on the backend, since it is a "hidden" operation. This is
+      consistent with piazza post @432.   
+
+   7. Since the log files stored in the back-end could potentially be very
       long, after the back-end receives a request to send its transaction log,
       it sends a UDP message for *each line* in the log, followed by an empty
       message that indicates that it has finished sending. The main server will
@@ -47,8 +74,5 @@ g. There are several things to note about my project, some of which are covered
       the final message is lost, which is possible, but unlikely, over UDP on
       a localhost. 
 
-   5. The main server will not listen on multiple sockets. Instead, it will 
-      only accept messages in the following order: A, B, A, B, A, ...
-
 h. I did not reuse any code. I based all my code on my own knowledge and
-   function specifications from class and man pages. 
+   function specifications from class and man pages.

@@ -24,13 +24,11 @@
 
 #define INDEX_TO_ID_OFFSET 65 // ascii code for "A"
 
-#define MAX_NAME_LENGTH 512
-#define MAX_TRANSACTION_LENGTH 1024
-
 // Between client and main server
 #define CLIENT_CHECK 1
 #define CLIENT_TRANSFER 2
 #define CLIENT_TXLIST 3
+#define CLIENT_STATS 4
 
 // Between main server and backend
 #define SERVER_CHECK 1
@@ -40,8 +38,19 @@
 #define TALKER 0
 #define LISTENER 1
 
+#define MAX_NAME_LENGTH 512
+#define MAX_TRANSACTION_LENGTH 1024
 #define MAX_NUM_TRANSACTIONS 3000
 #define INITIAL_ACCOUNT_VALUE 1000
+#define MAX_USERS_IN_NETWORK 100
+
+// for stat check
+typedef struct StatEntry {
+  int rank;
+  char username[MAX_NAME_LENGTH];
+  int numTX;
+  int netBalance;
+} statEntry;
 
 // from clientX to serverM
 typedef struct ClientRequest {
@@ -58,6 +67,8 @@ typedef struct ClientResponse {
   unsigned short senderPresent;
   unsigned short receiverPresent;
   unsigned short insufficientFunds;
+  statEntry userStats[MAX_USERS_IN_NETWORK];
+  unsigned short numUsers;
 } clientResponse;
 
 // from serverM to serverX
@@ -74,3 +85,4 @@ typedef struct ServerResponse {
   unsigned short finalResponse; // to indicate that no more bits should be listened for
   char transaction[MAX_TRANSACTION_LENGTH];
 } serverResponse;
+
